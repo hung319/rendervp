@@ -1,22 +1,30 @@
+# Sử dụng Ubuntu làm base image
 FROM ubuntu:latest
 
-# Cập nhật hệ thống
-RUN apt-get update && apt-get upgrade -y
+# Cập nhật và cài đặt các gói cần thiết
+RUN apt-get update && apt-get install -y \
+    openssh-server \
+    nginx \
+    sudo \
+    nano \
+    wget \
+    curl
 
-# Cài đặt các gói phần mềm cần thiết (ví dụ: SSH)
-RUN apt-get install -y openssh-server
-
-# Cấu hình SSH
+# Tạo thư mục cho SSH daemon
 RUN mkdir /var/run/sshd
-RUN echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
-RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-# Tạo user mới
-RUN useradd -rm -d /home/user -s /bin/bash -g root -G sudo -u 1000 user
-RUN echo 'user:password' | chpasswd
+# Tạo một người dùng mới và đặt mật khẩu
+RUN useradd -m -s /bin/bash vpsuser && echo 'vpsuser:password' | chpasswd
 
-# Mở cổng SSH
-EXPOSE 22
+# Cho phép người dùng vpsuser sử dụng sudo
+RUN usermod -aG sudo vpsuser
 
-# Khởi động SSH
-CMD ["/usr/sbin/sshd", "-D"]
+# Thay đổi cài đặt SSH để cho phép xác thực mật khẩu
+RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# Mở cổng 22 cho SSH và cổng 80 cho Nginx
+EXPOSE 22 80
+
+# Khởi động SSH và Nginx khi container bắt đầu
+CMD service ssh start && service nginx start && bash
